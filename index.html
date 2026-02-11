@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地平线艾迪平台 - 数据标注系统</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    
+    <style>
+        /* --- 全局设置 --- */
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f0f2f5; color: #333; height: 100vh; overflow: hidden; }
+        
+        /* 登录页样式 */
+        #login-page { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(180deg, #f8fbff 0%, #eef6fd 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+        .login-header { position: absolute; top: 20px; left: 24px; font-size: 18px; font-weight: 600; color: #333; display: flex; align-items: center; }
+        .login-header-icon { font-size: 22px; color: #1890ff; margin-right: 8px; }
+        .login-box { width: 420px; background: #fff; padding: 48px 40px 36px; border-radius: 8px; box-shadow: 0 6px 16px rgba(53, 107, 238, 0.08); text-align: center; }
+        .login-title { font-size: 20px; font-weight: 600; color: #333; margin-bottom: 36px; }
+        .input-group { margin-bottom: 20px; position: relative; text-align: left; }
+        .input-icon { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: #c0c4cc; font-size: 16px; }
+        .login-input { width: 100%; height: 44px; padding: 0 12px 0 36px; border: 1px solid #dcdfe6; border-radius: 4px; box-sizing: border-box; font-size: 14px; outline: none; transition: all 0.3s; color: #606266; }
+        .login-input:focus { border-color: #1890ff; }
+        .login-btn { width: 100%; height: 44px; background: #1890ff; color: #fff; border: none; border-radius: 4px; font-size: 16px; font-weight: 500; cursor: pointer; transition: all 0.3s; margin-top: 10px; }
+        .login-btn:hover { background: #40a9ff; }
+        .login-footer-link { margin-top: 16px; font-size: 13px; color: #1890ff; cursor: pointer; text-decoration: none; display: inline-block; }
+
+        /* 主应用布局 */
+        #main-app { display: none; height: 100vh; width: 100vw; }
+        .sidebar { width: 220px; background-color: #fff; border-right: 1px solid #e8e8e8; display: flex; flex-direction: column; flex-shrink: 0; }
+        .logo-area { height: 50px; display: flex; align-items: center; padding-left: 20px; font-weight: 600; color: #333; font-size: 15px; border-bottom: 1px solid #f0f0f0; background: #fff; }
+        .logo-icon { margin-right: 10px; color: #1890ff; }
+        .menu-list { flex: 1; overflow-y: auto; padding-top: 5px; }
+        .menu-item { padding: 0 16px 0 24px; height: 42px; line-height: 42px; color: #666; font-size: 13px; cursor: pointer; display: flex; align-items: center; transition: all 0.2s; border-right: 2px solid transparent; }
+        .menu-item:hover { color: #1890ff; background-color: #f0f2f5; }
+        .menu-item.active { background-color: #e6f7ff; color: #1890ff; border-right: 2px solid #1890ff; }
+        .menu-icon { width: 16px; margin-right: 10px; font-size: 14px; text-align: center; }
+        .menu-arrow { margin-left: auto; font-size: 12px; transform: scale(0.8); color: #999; }
+        
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; background: #f0f2f5; }
+        .top-nav { height: 48px; background: #fff; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; padding: 0 20px; justify-content: space-between; box-shadow: 0 1px 4px rgba(0,21,41,.08); z-index: 5; flex-shrink: 0; }
+        .nav-tabs { display: flex; gap: 30px; height: 100%; }
+        .nav-tab { height: 100%; display: flex; align-items: center; font-size: 14px; color: #666; border-bottom: 2px solid transparent; cursor: pointer; }
+        .nav-tab.active { color: #1890ff; border-bottom: 2px solid #1890ff; font-weight: 500; }
+        
+        .user-info { display: flex; align-items: center; }
+        .top-icon-bar { display: flex; align-items: center; gap: 12px; margin-right: 20px; border-right: 1px solid #e8e8e8; padding-right: 20px; height: 24px; }
+        .top-icon-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: #666; font-size: 14px; cursor: pointer; border-radius: 4px; transition: all 0.2s; position: relative; background-color: #f0f2f5; }
+        .top-icon-btn:hover { background-color: #e6f7ff; color: #1890ff; }
+        .badge-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background-color: #ff4d4f; border-radius: 50%; border: 1px solid #fff; }
+        .avatar { width: 24px; height: 24px; background: #1890ff; border-radius: 50%; color: #fff; text-align: center; line-height: 24px; margin-right: 8px; font-size: 12px; font-weight: bold; }
+        .username-text { font-size: 12px; color: #666; }
+
+        /* 工具栏通用 */
+        .filter-container { background: #fff; padding: 16px 24px; margin: 16px 24px 0; border-radius: 2px; }
+        .filter-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+        .filter-item { display: flex; flex-direction: column; gap: 6px; }
+        .filter-label { font-size: 12px; color: #666; }
+        .filter-input, .filter-select { height: 32px; border: 1px solid #d9d9d9; border-radius: 2px; padding: 0 10px; font-size: 13px; outline: none; background: #fff; color: #333; transition: all 0.3s; }
+        .btn-group { margin-top: 22px; display: flex; gap: 8px; }
+        .btn { height: 32px; padding: 0 16px; border-radius: 2px; font-size: 14px; cursor: pointer; border: 1px solid transparent; transition: all 0.3s; }
+        .btn-primary { background: #1890ff; color: #fff; border: 1px solid #1890ff; }
+        .btn-default { background: #fff; border-color: #d9d9d9; color: #666; }
+        .btn-sm { height: 28px; padding: 0 12px; font-size: 13px; line-height: 26px; }
+
+        /* 工作区 */
+        .work-panel { flex: 1; margin: 16px 24px; background: #fff; border-radius: 2px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #novel-wrapper { height:100%; display:flex; flex-direction:column; overflow:hidden; z-index: 10; position: relative; background-color: rgba(255,255,255,1); transition: background-color 0.3s; }
+        #novel-content { flex: 1; padding: 24px; overflow-y: auto; white-space: pre-wrap; font-family: "Consolas", "Monaco", "Courier New", monospace; font-size: 14px; line-height: 1.8; color: #555; display: none; }
+        
+        /* 聊天室 */
+        #chat-interface { display: none; flex: 1; flex-direction: column; height: 100%; background-color: #fff; z-index: 20; position: relative; }
+        .chat-header-bar { padding: 12px 20px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; color: #333; }
+        .chat-header-left { display: flex; align-items: center; }
+        .chat-icon-blue { color: #1890ff; margin-right: 8px; font-size: 16px; }
+        .chat-status-text { font-size: 12px; color: #999; margin-left: 10px; font-weight: normal; }
+        .btn-ghost-danger { background: transparent; border: 1px solid #ff7875; color: #ff4d4f; padding: 4px 12px; font-size: 12px; border-radius: 4px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
+        .btn-ghost-danger:hover { background-color: #fff1f0; border-color: #ff4d4f; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 20px; background-color: #fff; display: flex; flex-direction: column; gap: 20px; }
+        .message-row { display: flex; align-items: flex-start; gap: 12px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .chat-avatar { width: 36px; height: 36px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; flex-shrink: 0; }
+        .chat-bubble { background-color: #f5f5f5; padding: 10px 16px; border-radius: 4px; font-size: 14px; line-height: 1.6; color: #333; max-width: 80%; position: relative; word-wrap: break-word; }
+        .chat-meta { font-size: 12px; color: #999; margin-bottom: 4px; display: block; }
+        .message-row.self { flex-direction: row-reverse; }
+        .message-row.self .chat-bubble { background-color: #e6f7ff; }
+        .chat-input-area { border-top: 1px solid #e8e8e8; padding: 10px 20px 20px; background: #fff; }
+        .chat-tools { display: flex; gap: 16px; color: #999; font-size: 16px; margin-bottom: 10px; }
+        .chat-tool-icon:hover { color: #1890ff; cursor: pointer; }
+        .chat-textarea { width: 100%; border: none; outline: none; resize: none; height: 80px; font-size: 14px; color: #333; font-family: inherit; }
+        .chat-textarea::placeholder { color: #ccc; }
+        .chat-send-bar { display: flex; justify-content: flex-end; }
+        .btn-send { background: #1890ff; color: white; padding: 6px 24px; border: none; border-radius: 2px; cursor: pointer; font-size: 14px; }
+        .btn-send:hover { background: #40a9ff; }
+
+        .status-bar { height: 36px; background: #fff; border-top: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: flex-end; padding: 0 24px; font-size: 12px; color: #999; flex-shrink: 0; }
+
+        /* 需求管理 (隐藏) */
+        #requirement-interface { display: none; flex: 1; flex-direction: column; height: 100%; background-color: #f0f2f5; }
+        .req-header { background: #fff; padding: 16px 24px; margin: 16px 24px 0; border-radius: 2px; }
+        .req-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 24px; margin-bottom: 16px; }
+        .req-tabs-bar { padding: 0 24px; margin-top: 16px; display: flex; border-bottom: 1px solid #e8e8e8; background: #fff; margin-left: 24px; margin-right: 24px; }
+        .req-tab-item { padding: 12px 16px; font-size: 14px; cursor: pointer; color: #333; border-bottom: 2px solid transparent; }
+        .req-tab-item.active { color: #1890ff; border-bottom: 2px solid #1890ff; }
+        .req-toolbar { background: #fff; padding: 12px 24px; margin: 0 24px; display: flex; gap: 8px; align-items: center; }
+        .req-table-container { flex: 1; background: #fff; margin: 0 24px 16px; overflow: auto; border-top: 1px solid #f0f0f0; }
+        .req-table { width: 100%; border-collapse: collapse; min-width: 1200px; }
+        .req-table th { background: #fafafa; padding: 12px 8px; text-align: left; font-size: 13px; color: #333; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+        .req-table td { padding: 12px 8px; text-align: left; font-size: 13px; color: #666; border-bottom: 1px solid #e8e8e8; }
+
+        /* 视频会议回放界面样式 */
+        #video-meeting-interface { display: none; width: 100%; height: 100%; background-color: #f7f8fa; overflow: hidden; flex-direction: column; }
+        .vm-header { height: 56px; background: #fff; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; }
+        .vm-title-group { display: flex; align-items: center; gap: 10px; }
+        .vm-logo-icon { font-size: 20px; color: #722ed1; } 
+        .vm-title-text { font-size: 16px; font-weight: 600; color: #333; }
+        .vm-tag { background: #e6f7ff; color: #1890ff; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+        .vm-meta { font-size: 12px; color: #999; margin-left: 10px; }
+        .vm-header-actions { display: flex; align-items: center; gap: 8px; }
+        /* 新增：网络地址输入框 */
+        .vm-url-input { height: 28px; border: 1px solid #d9d9d9; border-radius: 4px; padding: 0 8px; font-size: 12px; width: 200px; transition: all 0.3s; }
+        .vm-url-input:focus { border-color: #1890ff; outline: none; width: 300px; }
+        .vm-body { display: flex; flex: 1; height: calc(100% - 56px); overflow: hidden; }
+        .vm-left-panel { flex: 2; display: flex; flex-direction: column; padding: 20px; overflow-y: auto; min-width: 600px; }
+        /* 视频容器 */
+        .vm-player-box { background: #000; border-radius: 8px; overflow: hidden; position: relative; aspect-ratio: 16/9; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .vm-video-element { width: 100%; height: 100%; object-fit: contain; }
+        /* 底部控制条 */
+        .vm-controls { height: 48px; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); position: absolute; bottom: 0; left: 0; width: 100%; display: flex; align-items: center; padding: 0 20px; color: #fff; gap: 16px; }
+        .vm-progress-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; position: relative; cursor: pointer;}
+        .vm-progress-current { width: 30%; height: 100%; background: #1890ff; border-radius: 2px; }
+        
+        .vm-timeline-area { background: #fff; padding: 20px; border-radius: 8px; flex: 1; }
+        .vm-tab-row { display: flex; gap: 24px; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 16px; }
+        .vm-tab { font-size: 14px; font-weight: 500; color: #666; cursor: pointer; }
+        .vm-tab.active { color: #1890ff; border-bottom: 2px solid #1890ff; padding-bottom: 10px; margin-bottom: -11px; }
+        .vm-speaker-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 12px; color: #666; }
+        .vm-speaker-avatar { width: 24px; height: 24px; border-radius: 50%; background: #faad14; margin-right: 10px; text-align: center; line-height: 24px; color: #fff; font-size: 10px; }
+        .vm-speaker-bar-bg { flex: 1; height: 6px; background: #f5f5f5; border-radius: 3px; margin: 0 10px; position: relative; }
+        .vm-speaker-segment { position: absolute; height: 100%; background: #1890ff; border-radius: 3px; }
+        
+        .vm-right-panel { flex: 1; background: #fff; border-left: 1px solid #e8e8e8; display: flex; flex-direction: column; min-width: 350px; max-width: 450px; }
+        .vm-right-tabs { display: flex; border-bottom: 1px solid #e8e8e8; padding: 0 16px; height: 48px; align-items: center; }
+        .vm-right-tab { margin-right: 24px; font-size: 14px; cursor: pointer; color: #666; height: 100%; display: flex; align-items: center; }
+        .vm-right-tab.active { color: #1890ff; border-bottom: 2px solid #1890ff; font-weight: 500; }
+        .vm-right-content { flex: 1; overflow-y: auto; padding: 20px; font-size: 13px; line-height: 1.6; color: #333; }
+        .vm-summary-card { background: #f9f9f9; padding: 16px; border-radius: 6px; margin-bottom: 16px; }
+        .vm-card-title { font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; color: #722ed1; }
+        .vm-list-ul { padding-left: 18px; margin: 0; }
+        .vm-list-li { margin-bottom: 6px; color: #555; }
+        .vm-chapter-item { display: flex; gap: 12px; margin-bottom: 20px; }
+        .vm-time-tag { color: #999; font-size: 12px; white-space: nowrap; margin-top: 2px; }
+        .vm-chapter-dot { width: 8px; height: 8px; background: #1890ff; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+        .vm-chapter-body { flex: 1; }
+        .vm-chapter-title { font-weight: 600; color: #333; margin-bottom: 4px; }
+        .vm-chapter-desc { color: #666; font-size: 12px; }
+
+        /* 五子棋界面样式 */
+        #game-interface { display: none; width: 100%; height: 100%; background-color: #f7f8fa; flex-direction: row; }
+        .game-left-area { flex: 1; display: flex; align-items: center; justify-content: center; background: #e3f2fd; position: relative; }
+        .game-canvas-box { padding: 20px; background: #dcb35c; border-radius: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative; }
+        canvas#gomoku-board { background: #dcb35c; cursor: pointer; display: block; }
+        .game-right-area { width: 320px; background: #fff; border-left: 1px solid #e8e8e8; display: flex; flex-direction: column; padding: 20px; }
+        .game-title { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 20px; text-align: center; }
+        .player-card { display: flex; align-items: center; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #eee; transition: all 0.3s; }
+        .player-card.active { border-color: #1890ff; background-color: #e6f7ff; transform: translateX(5px); }
+        .player-card-dot { width: 24px; height: 24px; border-radius: 50%; margin-right: 12px; border: 2px solid rgba(0,0,0,0.1); }
+        .player-name { font-size: 14px; font-weight: 500; color: #333; flex: 1; }
+        .game-log-box { flex: 1; border: 1px solid #f0f0f0; border-radius: 4px; margin: 20px 0; padding: 10px; overflow-y: auto; font-size: 12px; background: #fafafa; }
+        .game-log-item { margin-bottom: 4px; color: #666; }
+        .game-btn-group { display: flex; gap: 10px; }
+        .btn-game { flex: 1; height: 36px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; color: #fff; transition: all 0.2s; }
+        .btn-join { background: #52c41a; }
+        .btn-restart { background: #ff4d4f; }
+        .connection-status { text-align:center; font-size:12px; color:#999; margin-top:5px; }
+    </style>
+</head>
+<body>
+
+    <div id="login-page">
+        <div class="login-header"><i class="fas fa-comments login-header-icon"></i> 地平线艾迪平台</div>
+        <div class="login-box">
+            <div class="login-title">地平线账号登录</div>
+            <div class="input-group"><i class="far fa-user input-icon"></i><input type="text" id="login-account" class="login-input" placeholder="用户名" autocomplete="off"></div>
+            <div class="input-group"><i class="fas fa-unlock-alt input-icon"></i><input type="password" id="login-password" class="login-input" placeholder="密码"></div>
+            <button class="login-btn" onclick="enterSystem()">登 录</button>
+        </div>
+    </div>
+
+    <div id="main-app">
+        <div class="sidebar">
+            <div class="logo-area"><i class="fas fa-layer-group logo-icon"></i> 数据标注系统</div>
+            <div class="menu-list">
+                <div class="menu-item" onclick="window.location.href='https://anno.horizon.ai/data-label/task-management/init-task-list'">
+                    <i class="fas fa-tasks menu-icon"></i> 需求管理 
+                    <i class="fas fa-angle-down menu-arrow"></i>
+                </div>
+                <div class="menu-item"><i class="fas fa-project-diagram menu-icon"></i> 项目管理 <i class="fas fa-angle-down menu-arrow"></i></div>
+                <div class="menu-item"><i class="fas fa-database menu-icon"></i> 数据管理 <i class="fas fa-angle-down menu-arrow"></i></div>
+                <div class="menu-item"><i class="fas fa-cogs menu-icon"></i> 配置管理 <i class="fas fa-angle-down menu-arrow"></i></div>
+                <div class="menu-item"><i class="fas fa-shield-alt menu-icon"></i> 权限管理 <i class="fas fa-angle-down menu-arrow"></i></div>
+                <div class="menu-item"><i class="fas fa-chart-pie menu-icon"></i> 项目统计 <i class="fas fa-angle-down menu-arrow"></i></div>
+                <div class="menu-item"><i class="fas fa-user-clock menu-icon"></i> 个人统计 <i class="fas fa-angle-down menu-arrow"></i></div>
+                
+                <div class="menu-item" id="menu-game" onclick="switchModule('game')">
+                    <i class="fas fa-calculator menu-icon"></i> 结算管理 <i class="fas fa-angle-down menu-arrow"></i>
+                </div>
+                
+                <div class="menu-item" id="menu-video" onclick="switchModule('video')">
+                    <i class="fas fa-history menu-icon"></i> 运营周期管理 <i class="fas fa-angle-down menu-arrow"></i>
+                </div>
+                
+                <div class="menu-item" id="menu-chat" onclick="switchModule('chat')">
+                    <i class="fas fa-book menu-icon"></i> 标注文档管理 
+                    <i class="fas fa-angle-down menu-arrow"></i>
+                </div>
+                
+                <div class="menu-item active" id="menu-novel" onclick="switchModule('novel')">
+                    <i class="fas fa-desktop menu-icon"></i> 面板管理
+                </div>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="top-nav">
+                <div class="nav-tabs">
+                    <div class="nav-tab active" id="top-title">项目信息看板</div>
+                    <div class="nav-tab">项目数据统计</div>
+                    <div class="nav-tab">工时效能分析</div>
+                </div>
+                <div class="user-info">
+                    <div class="top-icon-bar">
+                        <div class="top-icon-btn"><i class="fas fa-headset"></i></div> 
+                        <div class="top-icon-btn"><i class="fas fa-download"></i></div> 
+                        <div class="top-icon-btn"><i class="fas fa-book"></i></div> 
+                        <div class="top-icon-btn" onclick="window.open('subdirectory/user manual.html', '_blank')" title="用户操作手册">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div class="top-icon-btn"><i class="far fa-bell"></i><span class="badge-dot"></span></div> 
+                        <div class="top-icon-btn"><i class="fas fa-cog"></i></div> 
+                        <div class="top-icon-btn" onclick="logout()" title="退出登录"><i class="fas fa-sign-out-alt" style="color:#ff4d4f;"></i></div> 
+                    </div>
+                    <div class="avatar" id="display-avatar">U</div> 
+                    <span class="username-text" id="display-username">user</span>
+                </div>
+            </div>
+
+            <div class="filter-container" id="novel-filters">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <span class="filter-label" style="font-weight:bold; color:#1890ff;">项目ID (点击导入)</span>
+                        <input type="text" class="filter-input" id="filename-display" placeholder="点击选择 TXT 文件..." onclick="document.getElementById('file-upload').click()" readonly style="cursor: pointer; width: 180px; background-color:#e6f7ff;">
+                        <input type="file" id="file-upload" accept=".txt" style="display:none;">
+                    </div>
+                    <div class="filter-item">
+                        <span class="filter-label">编码格式</span>
+                        <select class="filter-select" id="encoding-select" style="width: 100px;">
+                            <option value="UTF-8">UTF-8</option>
+                            <option value="GBK">GBK</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <span class="filter-label">视图缩放 (字号)</span>
+                        <select class="filter-select" id="font-size-select" style="width: 110px;">
+                            <option value="14px">14px (极小)</option>
+                            <option value="16px">16px (较小)</option>
+                            <option value="18px" selected>18px (默认)</option>
+                            <option value="20px">20px (中等)</option>
+                            <option value="24px">24px (较大)</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <span class="filter-label">Batch ID (页码)</span>
+                        <input type="number" id="page-index" class="filter-input" value="0" style="width: 80px;">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-default" onclick="prevPage()">清空</button>
+                        <button class="btn btn-primary" onclick="nextPage()">搜索</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="work-panel">
+                <div id="novel-wrapper" style="height:100%; display:flex; flex-direction:column; overflow:hidden;">
+                    <div id="empty-state" style="display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; color:#ccc;">
+                        <i class="fas fa-satellite-dish" style="font-size:48px; margin-bottom:20px; color:#e8e8e8;"></i>
+                        <div id="msg-hint">暂无数据加载，请导入项目源文件</div>
+                    </div>
+                    <div id="novel-content"></div>
+                    <div class="status-bar"><span id="status-text">Ready</span></div>
+                </div>
+
+                <div id="chat-interface">
+                    <div class="chat-header-bar">
+                        <div class="chat-header-left">
+                            <i class="fas fa-comments chat-icon-blue"></i> 文档协作讨论组
+                            <span class="chat-status-text" id="chat-status-text">(正在连接...)</span>
+                        </div>
+                        <button class="btn-ghost-danger" onclick="clearChatHistory()">
+                            <i class="fas fa-trash-alt"></i> 清空记录
+                        </button>
+                    </div>
+                    <div class="chat-messages" id="chat-messages-box">
+                    </div>
+                    <div class="chat-input-area">
+                        <div class="chat-tools">
+                            <i class="far fa-smile chat-tool-icon"></i>
+                            <i class="far fa-image chat-tool-icon"></i>
+                            <i class="fas fa-paperclip chat-tool-icon"></i>
+                        </div>
+                        <textarea class="chat-textarea" id="chat-input" placeholder="在此输入内容... (按 Enter 发送)"></textarea>
+                        <div class="chat-send-bar">
+                            <button class="btn-send" onclick="sendChatMessage()">发送 (S)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="video-meeting-interface">
+                    <div class="vm-header">
+                        <div class="vm-title-group">
+                            <i class="fas fa-wave-square vm-logo-icon"></i>
+                            <span class="vm-title-text">【TY2】2d车道线答疑群的视频会议</span>
+                            <span class="vm-tag">外部</span>
+                            <span class="vm-meta">2026年1月20日 下午5:07 | 6分17秒</span>
+                        </div>
+                        <div class="vm-header-actions">
+                            <input type="file" id="video-file-input" accept="video/mp4,video/webm" style="display:none" onchange="loadVideoFile(this)">
+                            
+                            <div style="position:relative;">
+                                <input type="text" id="net-video-url" class="vm-url-input" placeholder="粘贴视频链接 (http://...)">
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="loadNetVideo()">
+                                <i class="fas fa-play-circle"></i> 播放
+                            </button>
+
+                            <button class="btn btn-default btn-sm" onclick="document.getElementById('video-file-input').click()" title="备用：导入本地文件">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                            
+                            <button class="btn btn-default btn-sm"><i class="fas fa-ellipsis-h"></i></button>
+                        </div>
+                    </div>
+                    <div class="vm-body">
+                        <div class="vm-left-panel">
+                            <div class="vm-player-box">
+                                <video id="meeting-player" class="vm-video-element" controls style="background:#000;">
+                                    <source src="" type="video/mp4">
+                                </video>
+                            </div>
+
+                            <div class="vm-timeline-area">
+                                <div class="vm-tab-row"><div class="vm-tab active">发言人 (3)</div><div class="vm-tab">会议信息</div></div>
+                                <div class="vm-speaker-row">
+                                    <div class="vm-speaker-avatar" style="background:#87d068;">王</div><span>王国峰</span>
+                                    <div class="vm-speaker-bar-bg"><div class="vm-speaker-segment" style="left:0%; width:40%;"></div></div>
+                                </div>
+                                <div class="vm-speaker-row">
+                                    <div class="vm-speaker-avatar" style="background:#1890ff;">刘</div><span>刘斌</span>
+                                    <div class="vm-speaker-bar-bg"><div class="vm-speaker-segment" style="left:42%; width:5%;"></div></div>
+                                </div>
+                                <div class="vm-speaker-row">
+                                    <div class="vm-speaker-avatar" style="background:#fa8c16;">苏</div>
+                                    <span style="width:50px;">苏爱</span> <span style="color:#999;">5%</span>
+                                    <div class="vm-speaker-bar-bg">
+                                        <div class="vm-speaker-segment" style="left:90%; width:5%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="vm-right-panel">
+                            <div class="vm-right-tabs"><div class="vm-right-tab active">智能纪要</div><div class="vm-right-tab">文字记录</div></div>
+                            <div class="vm-right-content">
+                                <div class="vm-summary-card">
+                                    <div class="vm-card-title"><i class="fas fa-star"></i> 会议纪要</div>
+                                    <div style="font-size:12px; color:#666; margin-bottom:10px;">本次会议由王国峰介绍三目组数据中车道线标注相关内容...</div>
+                                </div>
+                                <div class="vm-card-title" style="margin-top:20px; color:#722ed1;"><i class="fas fa-bookmark"></i> 章节纪要</div>
+                                <div class="vm-chapter-item"><div class="vm-time-tag">00:07</div><div class="vm-chapter-dot"></div><div class="vm-chapter-body"><div class="vm-chapter-title">三目组车道线标注数据背景...</div></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="game-interface">
+                    <div class="game-left-area">
+                        <div class="game-canvas-box">
+                            <canvas id="gomoku-board" width="600" height="600"></canvas>
+                        </div>
+                    </div>
+                    <div class="game-right-area">
+                        <div class="game-title">联机五子棋 (动态人数)</div>
+                        <div class="connection-status" id="mqtt-status"><i class="fas fa-circle-notch fa-spin"></i> 正在连接服务器...</div>
+                        <div class="game-btn-group" style="margin-bottom:20px;">
+                            <button class="btn-game btn-join" onclick="publishJoinGame()">加入并重置</button>
+                            <button class="btn-game btn-restart" onclick="publishRestartGame()">强制重开</button>
+                        </div>
+                        <div id="player-list"></div>
+                        <div class="game-log-box" id="game-log"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 全局配置 ---
+        const MQTT_BROKER = "broker.emqx.io"; // 公共免费MQTT服务器
+        const MQTT_PORT = 8083;
+        const MQTT_PATH = "/mqtt";
+        const MQTT_TOPIC_BASE = "horizon/aidi/demo/v1/"; // 唯一频道
+
+        let currentUser = "User";
+        let currentMode = "novel"; 
+        let mqttClient = null;
+        let isConnected = false;
+
+        // --- 五子棋配置 ---
+        const BOARD_SIZE = 15;
+        const GRID_SIZE = 40; 
+        const COLORS = ['#000000', '#ffffff', '#1890ff', '#f5222d', '#52c41a', '#722ed1']; // 支持多人
+        const PLAYER_NAMES = ['黑方', '白方', '蓝方', '红方', '绿方', '紫方'];
+        
+        let canvas, ctx;
+        // 游戏状态
+        let gameState = { 
+            players: [], 
+            board: [], 
+            turn: 0, 
+            winner: null, 
+            lastMove: null 
+        };
+
+        window.onload = function() {
+            const savedUser = localStorage.getItem('horizon_auto_login_user');
+            if (savedUser) { document.getElementById('login-account').value = savedUser; enterSystem(); }
+            initMQTT(); 
+        };
+
+        function enterSystem() {
+            const accountInput = document.getElementById('login-account').value;
+            if (!accountInput) { alert("请输入用户名"); return; }
+            localStorage.setItem('horizon_auto_login_user', accountInput);
+            currentUser = accountInput;
+            document.getElementById('display-username').innerText = currentUser;
+            document.getElementById('display-avatar').innerText = currentUser.charAt(0).toUpperCase();
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('main-app').style.display = 'flex';
+        }
+        function logout() { localStorage.removeItem('horizon_auto_login_user'); location.reload(); }
+
+        // --- MQTT 核心逻辑 (实现聊天+五子棋联机) ---
+        function initMQTT() {
+            const clientId = "client_" + Math.random().toString(16).substr(2, 8);
+            mqttClient = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, MQTT_PATH, clientId);
+
+            mqttClient.onConnectionLost = (obj) => {
+                console.log("MQTT断开:", obj.errorMessage);
+                isConnected = false;
+                updateStatus("连接断开，正在重连...");
+                setTimeout(initMQTT, 5000);
+            };
+
+            mqttClient.onMessageArrived = (message) => {
+                const payload = JSON.parse(message.payloadString);
+                
+                // 1. 聊天消息
+                if (payload.type === 'chat') {
+                    renderChatMessage(payload);
+                }
+                
+                // 2. 游戏消息
+                if (payload.type === 'game_state_update') {
+                    // 收到最新状态，更新本地
+                    gameState = payload.state;
+                    drawBoard();
+                    updatePlayerList();
+                    if(payload.log) addLog(payload.log);
+                    if(payload.state.winner !== null) alert(`游戏结束！${PLAYER_NAMES[payload.state.winner]} 获胜！`);
+                }
+            };
+
+            mqttClient.connect({
+                onSuccess: () => {
+                    isConnected = true;
+                    updateStatus("● 在线");
+                    mqttClient.subscribe(MQTT_TOPIC_BASE + "#");
+                },
+                useSSL: false
+            });
+        }
+
+        function publishMessage(subTopic, data) {
+            if (!isConnected) return;
+            const payload = JSON.stringify({ ...data, sender: currentUser });
+            const message = new Paho.MQTT.Message(payload);
+            message.destinationName = MQTT_TOPIC_BASE + subTopic;
+            mqttClient.send(message);
+        }
+
+        function updateStatus(text) {
+            document.getElementById('mqtt-status').innerText = text;
+            document.getElementById('chat-status-text').innerText = text;
+        }
+
+        // --- 聊天逻辑 (真联机) ---
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            const msgData = {
+                type: 'chat',
+                text: text,
+                time: new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute:'2-digit'})
+            };
+            publishMessage("chat", msgData);
+            input.value = '';
+        }
+        
+        function renderChatMessage(data) {
+            const box = document.getElementById('chat-messages-box');
+            const isSelf = data.sender === currentUser;
+            const color = getUserColor(data.sender);
+            const html = `
+                <div class="message-row ${isSelf ? 'self' : ''}">
+                    <div class="chat-avatar" style="background-color: ${color}">${data.sender.substring(0,2)}</div>
+                    <div><span class="chat-meta">${data.sender} · ${data.time}</span><div class="chat-bubble">${data.text}</div></div>
+                </div>`;
+            box.insertAdjacentHTML('beforeend', html);
+            box.scrollTop = box.scrollHeight;
+        }
+        
+        function getUserColor(username) {
+            let hash = 0; for (let i = 0; i < username.length; i++) hash = username.charCodeAt(i) + ((hash << 5) - hash);
+            const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+            return '#' + "00000".substring(0, 6 - c.length) + c;
+        }
+
+        document.getElementById('chat-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+        });
+
+        // --- 五子棋逻辑 (动态人数 + 自动重置) ---
+        function initGameCanvas() {
+            canvas = document.getElementById('gomoku-board');
+            if(canvas.getAttribute('data-init') === 'true') return;
+            ctx = canvas.getContext('2d');
+            canvas.addEventListener('click', handleBoardClick);
+            canvas.setAttribute('data-init', 'true');
+            // 如果本地还没数据，初始化空盘
+            if(gameState.board.length === 0) resetLocalState();
+            drawBoard();
+        }
+
+        function resetLocalState() {
+            gameState.board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(-1));
+            gameState.turn = 0;
+            gameState.winner = null;
+            gameState.lastMove = null;
+            // players 保留为空，等待加入
+        }
+
+        // 加入游戏：加入时自动重置棋盘
+        function publishJoinGame() {
+            // 检查是否已在列表中
+            const exists = gameState.players.find(p => p.name === currentUser);
+            if (exists) { alert("你已经在游戏中了"); return; }
+
+            // 新逻辑：有人加入 -> 清空棋盘 -> 重新开始
+            const newBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(-1));
+            
+            // 2. 更新玩家列表 (把之前的人保留，加上我)
+            const newPlayers = [...gameState.players, { name: currentUser, colorIdx: gameState.players.length }];
+            
+            const newState = {
+                players: newPlayers,
+                board: newBoard,
+                turn: 0,
+                winner: null,
+                lastMove: null
+            };
+            
+            publishMessage('game_state_update', { 
+                type: 'game_state_update',
+                state: newState,
+                log: `玩家 ${currentUser} 加入，游戏已自动重置！当前 ${newPlayers.length} 人对战`
+            });
+        }
+
+        function publishRestartGame() {
+            if(!confirm("确定要强制重置棋盘吗？")) return;
+            const newBoard = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(-1));
+            const newState = { ...gameState, board: newBoard, turn: 0, winner: null, lastMove: null };
+            publishMessage('game_state_update', { 
+                type: 'game_state_update',
+                state: newState,
+                log: `玩家 ${currentUser} 强制重置了棋盘`
+            });
+        }
+
+        function handleBoardClick(e) {
+            // 1. 还没开始或已结束
+            if (gameState.players.length < 2) { alert("至少需要2人才能开始！请让朋友点击加入。"); return; }
+            if (gameState.winner !== null) return;
+
+            // 2. 找到我是哪个颜色
+            const me = gameState.players.find(p => p.name === currentUser);
+            if (!me) { alert("请先点击【加入游戏】！"); return; }
+
+            // 3. 轮到我了吗？
+            // 动态人数逻辑：turn 取模 players.length
+            const currentTurnColorIdx = gameState.turn % gameState.players.length;
+            
+            // 我自己的 colorIdx 是否等于 当前回合的 colorIdx
+            // 注意：gameState.players[currentTurnColorIdx] 就是当前该下的玩家
+            // 比如 3人玩，turn=3 -> 3%3=0 -> 玩家0(黑方) 下
+            
+            if (me.colorIdx !== currentTurnColorIdx) { return; /* 不是我的回合 */ }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.round((e.clientX - rect.left - 20) / GRID_SIZE);
+            const y = Math.round((e.clientY - rect.top - 20) / GRID_SIZE);
+
+            if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) return;
+            if (gameState.board[y][x] !== -1) return;
+
+            // 落子有效，计算新状态
+            const newBoard = JSON.parse(JSON.stringify(gameState.board));
+            newBoard[y][x] = me.colorIdx;
+            
+            let newWinner = null;
+            if (checkWin(newBoard, x, y, me.colorIdx)) {
+                newWinner = me.colorIdx;
+            }
+
+            const newState = {
+                ...gameState,
+                board: newBoard,
+                turn: gameState.turn + 1,
+                winner: newWinner,
+                lastMove: {x, y}
+            };
+
+            publishMessage('game_state_update', { 
+                type: 'game_state_update',
+                state: newState 
+            });
+        }
+
+        function checkWin(board, x, y, color) {
+            const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+            for (let [dx, dy] of dirs) {
+                let count = 1;
+                for (let i=1; i<5; i++) { 
+                    if(x+i*dx>=0 && x+i*dx<15 && y+i*dy>=0 && y+i*dy<15 && board[y+i*dy][x+i*dx]===color) count++; else break; 
+                }
+                for (let i=1; i<5; i++) { 
+                    if(x-i*dx>=0 && x-i*dx<15 && y-i*dy>=0 && y-i*dy<15 && board[y-i*dy][x-i*dx]===color) count++; else break; 
+                }
+                if(count>=5) return true;
+            }
+            return false;
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 画线
+            ctx.beginPath(); ctx.strokeStyle = "#8b5a2b";
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                ctx.moveTo(20 + i * GRID_SIZE, 20); ctx.lineTo(20 + i * GRID_SIZE, 580);
+                ctx.moveTo(20, 20 + i * GRID_SIZE); ctx.lineTo(580, 20 + i * GRID_SIZE);
+            }
+            ctx.stroke();
+            // 画子
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    const c = gameState.board[y][x];
+                    if (c !== -1) {
+                        // 颜色根据人数循环取
+                        const colorCode = COLORS[c % COLORS.length]; 
+                        ctx.beginPath(); ctx.arc(20 + x * GRID_SIZE, 20 + y * GRID_SIZE, 16, 0, 2 * Math.PI);
+                        ctx.fillStyle = colorCode; ctx.fill();
+                        if(colorCode==='#ffffff'){ ctx.lineWidth=1; ctx.strokeStyle="#ccc"; ctx.stroke(); }
+                    }
+                }
+            }
+            // 标记
+            if (gameState.lastMove) {
+                const {x, y} = gameState.lastMove;
+                ctx.beginPath(); ctx.arc(20 + x * GRID_SIZE, 20 + y * GRID_SIZE, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = "red"; ctx.fill();
+            }
+        }
+
+        function updatePlayerList() {
+            const list = document.getElementById('player-list');
+            let html = '';
+            
+            if (gameState.players.length === 0) {
+                html = '<div style="color:#999;text-align:center;margin-top:20px;">暂无玩家，点击上方【加入游戏】开始</div>';
+            } else {
+                // 计算当前轮到谁
+                const activeIdx = gameState.turn % gameState.players.length;
+                
+                gameState.players.forEach((p, idx) => {
+                    const colorCode = COLORS[idx % COLORS.length];
+                    const roleName = PLAYER_NAMES[idx % PLAYER_NAMES.length];
+                    const isActive = (idx === activeIdx && gameState.winner === null);
+                    
+                    html += `
+                        <div class="player-card ${isActive?'active':''}" style="border-left:5px solid ${colorCode}">
+                            <div class="player-card-dot" style="background:${colorCode}"></div>
+                            <div class="player-name">${roleName}: ${p.name}</div>
+                            ${isActive ? '<i class="fas fa-chess-pawn" style="color:#1890ff"></i>' : ''}
+                        </div>`;
+                });
+            }
+            list.innerHTML = html;
+        }
+        function addLog(msg) { 
+            const box = document.getElementById('game-log');
+            box.innerHTML += `<div class="game-log-item">[系统] ${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // --- 模块切换 ---
+        function switchModule(moduleName) {
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            const novelFilters = document.getElementById('novel-filters');
+            const novelWrapper = document.getElementById('novel-wrapper');
+            const chatInterface = document.getElementById('chat-interface');
+            const videoInterface = document.getElementById('video-meeting-interface');
+            const gameInterface = document.getElementById('game-interface');
+
+            // 隐藏所有
+            novelWrapper.style.display = 'none';
+            chatInterface.style.display = 'none';
+            videoInterface.style.display = 'none';
+            gameInterface.style.display = 'none';
+            novelFilters.style.display = 'none'; 
+
+            if (moduleName === 'chat') {
+                // 标注文档管理 -> 聊天室
+                document.getElementById('menu-chat').classList.add('active');
+                document.getElementById('top-title').innerText = "标注文档与沟通";
+                chatInterface.style.display = 'flex';
+                // novelFilters.style.display = 'block'; // 按照要求删除筛选栏
+                currentMode = 'chat';
+
+            } else if (moduleName === 'video') {
+                // 运营周期管理 -> 视频
+                document.getElementById('menu-video').classList.add('active');
+                document.getElementById('top-title').innerText = "运营周期视频回放";
+                videoInterface.style.display = 'flex';
+                currentMode = 'video';
+
+            } else if (moduleName === 'game') {
+                // 结算管理 -> 五子棋
+                document.getElementById('menu-game').classList.add('active');
+                document.getElementById('top-title').innerText = "团队休闲 - 结算周期";
+                gameInterface.style.display = 'flex';
+                initGameCanvas();
+                currentMode = 'game';
+
+            } else if (moduleName === 'novel') {
+                // 面板管理 -> 小说
+                document.getElementById('menu-novel').classList.add('active');
+                document.getElementById('top-title').innerText = "项目信息看板";
+                novelFilters.style.display = 'block';
+                novelWrapper.style.display = 'flex';
+                currentMode = 'novel';
+            }
+        }
+
+        // --- 文件逻辑 ---
+        const fileInput = document.getElementById('file-upload');
+        fileInput.addEventListener('change', function() {
+            const reader = new FileReader();
+            reader.onload = e => { 
+                document.getElementById('novel-content').innerText = e.target.result;
+                document.getElementById('empty-state').style.display = 'none';
+                document.getElementById('novel-content').style.display = 'block';
+            };
+            reader.readAsText(this.files[0], 'GBK');
+        });
+        
+        function loadNetVideo() {
+            const urlInput = document.getElementById('net-video-url');
+            const url = urlInput.value.trim();
+            const videoPlayer = document.getElementById('meeting-player');
+
+            if (!url) {
+                const demoUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4"; 
+                if(confirm("未输入地址，是否加载演示视频？")) {
+                    videoPlayer.src = demoUrl;
+                    videoPlayer.play();
+                    urlInput.value = demoUrl;
+                }
+                return;
+            }
+            if (!url.startsWith('http')) { alert("请输入正确的视频链接！"); return; }
+            videoPlayer.src = url;
+            videoPlayer.play();
+        }
+        
+        document.getElementById('login-password').addEventListener('keypress', function (e) { if (e.key === 'Enter') enterSystem(); });
+        document.getElementById('login-account').addEventListener('keypress', function (e) { if (e.key === 'Enter') enterSystem(); });
+    </script>
+</body>
+</html>
