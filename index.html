@@ -3,29 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>王国峰 | Wang Guofeng's personal homepage </title>
+    <title>王国峰 | Guofeng Wang</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #fdfbf7; color: #242424; overflow-x: hidden; }
         .ambient-glow { position: fixed; width: 80vw; height: 80vw; max-width: 600px; max-height: 600px; background: radial-gradient(circle, rgba(219, 234, 254, 0.4) 0%, rgba(253, 251, 247, 0) 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1; pointer-events: none; }
+        
+        /* 贪吃蛇画布专属样式：固定在底层，穿透鼠标点击 */
+        #snake-canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -2; pointer-events: none; }
+
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); cursor: pointer; }
         .fade-in { animation: fadeIn 0.4s ease-in-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .hidden-section { display: none; }
         
-        /* PDF 容器的高度控制 */
-        .pdf-container { height: 80vh; min-height: 500px; }
+        .hidden-section { display: none !important; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col relative">
+
+    <canvas id="snake-canvas"></canvas>
 
     <div class="ambient-glow"></div>
 
     <header class="w-full p-6 flex justify-between items-center z-20">
         <div class="flex items-center gap-2 cursor-pointer" onclick="showSection('home')">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-400 to-blue-500 flex items-center justify-center text-white font-bold text-xs">GF</div>
-            <span class="font-semibold text-gray-700 tracking-tight">Wang Guofeng's personal homepage</span>
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-400 to-blue-500 flex items-center justify-center text-white font-bold text-xs">Wang</div>
+            <span class="font-semibold text-gray-700 tracking-tight">王国峰</span>
         </div>
         <div class="text-sm text-gray-500 font-medium">Beijing, CN</div>
     </header>
@@ -34,25 +38,23 @@
         
         <div id="home-section" class="w-full flex flex-col items-center text-center fade-in">
             <h1 class="text-4xl md:text-5xl font-medium mb-8 text-gray-800 tracking-tight">
-                Hi there. <br>
-                <span class="bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-blue-600">I'm 王国峰.</span>
+                你好！ <br>
+                <span class="bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-blue-600">欢迎来到王国峰的个人主页</span>
             </h1>
             <p class="text-lg text-gray-500 mb-10 max-w-2xl font-light">
-                拥有8年经验的数据标注项目经理。<br>欢迎来到我的数字空间，今天想了解点什么？
+                拥有 8 年经验的数据标注项目经理。<br>欢迎来到我的数字空间，今天想了解点什么？
             </p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl">
                 <div onclick="showSection('resume')" class="card-hover p-6 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-2xl text-left group">
                     <div class="text-sm font-semibold text-gray-400 mb-2 uppercase tracking-wider">Experience</div>
-                    <div class="text-gray-800 font-medium text-lg group-hover:text-teal-600 transition-colors">预览 PDF 简历</div>
-                    <div class="mt-2 text-sm text-gray-500">Data Annotation PM</div>
+                    <div class="text-gray-800 font-medium text-lg group-hover:text-teal-600 transition-colors">预览在线简历</div>
+                    <div class="mt-2 text-sm text-gray-500">读取 PDF 版本</div>
                 </div>
-                
                 <div onclick="showSection('projects')" class="card-hover p-6 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-2xl text-left group">
                     <div class="text-sm font-semibold text-gray-400 mb-2 uppercase tracking-wider">Dev</div>
                     <div class="text-gray-800 font-medium text-lg group-hover:text-purple-600 transition-colors">Python 开发</div>
                     <div class="mt-2 text-sm text-gray-500">实用小工具与脚本</div>
                 </div>
-
                 <div onclick="showSection('hobbies')" class="card-hover p-6 bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-2xl text-left group">
                     <div class="text-sm font-semibold text-gray-400 mb-2 uppercase tracking-wider">Life</div>
                     <div class="text-gray-800 font-medium text-lg group-hover:text-pink-600 transition-colors">业余生活</div>
@@ -61,42 +63,56 @@
             </div>
         </div>
 
-        <div id="resume-section" class="w-full hidden-section flex flex-col h-full">
-            <div class="flex justify-between items-center mb-4">
+        <div id="resume-section" class="w-full flex flex-col h-full relative max-w-5xl mx-auto hidden-section">
+            <div class="flex justify-between items-center mb-6">
                 <button onclick="showSection('home')" class="text-teal-600 hover:text-teal-800 flex items-center gap-2 font-medium transition-colors">
                     ← 返回首页
                 </button>
-                
                 <a href="resume/resume.pdf" target="_blank" class="flex items-center gap-2 text-sm bg-teal-600 text-white px-4 py-2 rounded-full hover:bg-teal-700 transition shadow-sm font-medium">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    下载 / 全屏查看
+                    全屏 / 下载 PDF
                 </a>
             </div>
-
-            <div class="w-full bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden pdf-container relative">
+            <div class="w-full bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-[80vh] min-h-[600px]">
                 <iframe src="resume/resume.pdf" class="w-full h-full border-none">
-                    <div class="flex flex-col items-center justify-center h-full text-gray-500">
-                        <p>您的浏览器不支持直接预览 PDF。</p>
-                        <a href="resume/resume.pdf" class="text-teal-600 mt-2 underline">点击此处下载查看</a>
+                    <div class="flex flex-col items-center justify-center h-full text-gray-500 bg-gray-50">
+                        <svg class="w-12 h-12 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        <p>您的浏览器暂时不支持直接预览 PDF。</p>
+                        <a href="resume/resume.pdf" class="text-teal-600 mt-2 font-medium hover:underline">点击此处直接下载查看</a>
                     </div>
                 </iframe>
             </div>
         </div>
 
         <div id="projects-section" class="w-full max-w-3xl hidden-section">
-            <button onclick="showSection('home')" class="mb-6 text-purple-600">← 返回首页</button>
-            <div class="bg-white rounded-3xl p-8 shadow-sm">Python 项目内容建设中...</div>
+            <button onclick="showSection('home')" class="mb-6 text-purple-600 hover:text-purple-800 flex items-center gap-2 font-medium">← 返回首页</button>
+            <div class="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-bold mb-4 text-gray-800">Python 探索</h3>
+                <p class="text-gray-600">这里可以展示你平时写的自动化小工具和脚本介绍。</p>
+            </div>
         </div>
         <div id="hobbies-section" class="w-full max-w-3xl hidden-section">
-            <button onclick="showSection('home')" class="mb-6 text-pink-600">← 返回首页</button>
-            <div class="bg-white rounded-3xl p-8 shadow-sm">生活内容建设中...</div>
+            <button onclick="showSection('home')" class="mb-6 text-pink-600 hover:text-pink-800 flex items-center gap-2 font-medium">← 返回首页</button>
+            <div class="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-bold mb-4 text-gray-800">生活碎片</h3>
+                <p class="text-gray-600">这里可以放置使用相机拍摄的素材、自学记录等内容。</p>
+            </div>
         </div>
 
     </main>
 
+    <div class="fixed bottom-6 left-6 z-30 bg-white/70 backdrop-blur-md border border-teal-100 rounded-2xl px-4 py-2 shadow-sm flex items-center gap-3 pointer-events-none fade-in">
+        <div class="text-3xl" id="target-fruit-icon">🍎</div>
+        <div class="flex flex-col">
+            <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">已吃掉</span>
+            <div class="text-xl font-bold text-gray-800 leading-none mt-1">
+                <span id="score-count" class="text-teal-600 font-mono">0</span> <span class="text-sm font-normal text-gray-500">个</span>
+            </div>
+        </div>
+    </div>
+
     <script>
         const sections = ['home-section', 'resume-section', 'projects-section', 'hobbies-section'];
-
         function showSection(targetSectionName) {
             const targetId = targetSectionName + '-section';
             sections.forEach(id => {
@@ -111,6 +127,123 @@
             });
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+    </script>
+
+    <script>
+        const canvas = document.getElementById('snake-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let mouse = { x: -100, y: -100 }; 
+        
+        let snake = [];
+        let numSegments = 25; 
+        
+        // 分数统计相关变量
+        let score = 0;
+        const scoreDisplay = document.getElementById('score-count');
+        const targetFruitIcon = document.getElementById('target-fruit-icon');
+        
+        const fruits = ['🍎', '🍅', '🍍', '🥝'];
+        let currentFruit = null;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize(); 
+
+        for(let i = 0; i < numSegments; i++) {
+            snake.push({x: width / 2, y: height / 2});
+        }
+
+        currentFruit = spawnFruit();
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        function spawnFruit() {
+            let newFruit = {
+                x: Math.random() * (width - 150) + 75, 
+                y: Math.random() * (height - 150) + 75,
+                emoji: fruits[Math.floor(Math.random() * fruits.length)],
+                timeOffset: Math.random() * 100 
+            };
+            // 每次生成新水果时，更新左下角计分板的图标
+            if(targetFruitIcon) targetFruitIcon.innerText = newFruit.emoji;
+            return newFruit;
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            if (currentFruit) {
+                let floatY = Math.sin(Date.now() / 300 + currentFruit.timeOffset) * 6;
+                ctx.font = "32px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.globalAlpha = 0.8; 
+                ctx.fillText(currentFruit.emoji, currentFruit.x, currentFruit.y + floatY);
+            }
+
+            if (mouse.x !== -100) {
+                snake[0].x += (mouse.x - snake[0].x) * 0.25;
+                snake[0].y += (mouse.y - snake[0].y) * 0.25;
+                for (let i = 1; i < snake.length; i++) {
+                    let dx = snake[i - 1].x - snake[i].x;
+                    let dy = snake[i - 1].y - snake[i].y;
+                    snake[i].x += dx * 0.45;
+                    snake[i].y += dy * 0.45;
+                }
+            }
+
+            ctx.globalAlpha = 0.25; 
+            for (let i = snake.length - 1; i >= 0; i--) {
+                const point = snake[i];
+                const radius = Math.max(14 - (i * 12 / snake.length), 2); 
+                
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = i === 0 ? "#0f766e" : "#14b8a6"; 
+                ctx.fill();
+
+                if (i === 0) {
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath(); ctx.arc(point.x - 4, point.y - 4, 2.5, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(point.x + 4, point.y - 4, 2.5, 0, Math.PI*2); ctx.fill();
+                    ctx.globalAlpha = 0.25; 
+                }
+            }
+            ctx.globalAlpha = 1.0;
+
+            if (mouse.x !== -100 && currentFruit) {
+                const head = snake[0];
+                const dx = head.x - currentFruit.x;
+                const dy = head.y - currentFruit.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < 35) {
+                    // 1. 小蛇变长
+                    const tail = snake[snake.length - 1];
+                    for (let k = 0; k < 6; k++) {
+                        snake.push({x: tail.x, y: tail.y});
+                    }
+                    
+                    // 2. 分数增加并更新界面
+                    score++;
+                    if(scoreDisplay) scoreDisplay.innerText = score;
+
+                    // 3. 生成新的水果
+                    currentFruit = spawnFruit();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
     </script>
 </body>
 </html>
